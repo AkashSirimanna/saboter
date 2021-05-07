@@ -3,11 +3,11 @@ package main
 import (
 	"context"
 	"flag"
-	"fmt"
 	"log"
 	"time"
 
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"akashsirimanna.com/saboter/saboter"
+
 	kubeinformers "k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/tools/clientcmd"
@@ -36,12 +36,8 @@ func main() {
 	informerFactory := kubeinformers.NewSharedInformerFactory(client, time.Second*30)
 	informerFactory.Start(stop)
 
-	listOptions := metav1.ListOptions{LabelSelector: "sabotage=true"}
-	pods, err := client.CoreV1().Pods("").List(context.TODO(), listOptions)
-	if err != nil {
-		log.Fatal(err)
-	}
-	fmt.Printf("There are %d pods in the cluster with the sabotage label\n", len(pods.Items))
+	saboter := saboter.NewSaboter(client, 1)
+	saboter.Start(context.TODO())
 }
 
 func init() {
