@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"log"
+	"math/rand"
 	"os"
 	"os/signal"
 	"syscall"
@@ -28,6 +29,7 @@ func NewSaboter(client kubernetes.Interface, rate int64, excludedDays map[string
 }
 
 func (saboter *Saboter) Start(ctx context.Context) {
+	gracePeriodSeconds := int64(1)
 	signalChannel := make(chan os.Signal)
 	signal.Notify(signalChannel, os.Interrupt, syscall.SIGTERM)
 	log.Print("Registering signal handlers...")
@@ -48,10 +50,41 @@ func (saboter *Saboter) Start(ctx context.Context) {
 			continue
 		}
 		listOptions := metav1.ListOptions{LabelSelector: "sabotage=true"}
-		pods, err := saboter.Client.CoreV1().Pods("").List(context.TODO(), listOptions)
+		pods, err := saboter.Client.CoreV1().Pods("").List(ctx, listOptions)
 		if err != nil {
 			log.Fatal(err)
 		}
-		log.Printf("There are %d pods in the cluster with the sabotage label\n", len(pods.Items))
+
+		if len(pods.Items) == 0 {
+			log.Println("No pods with sabotage label, waiting until pods with the label appear")
+			labelExists := make(chan bool, 1)
+			go func() {
+				for range time.Tick(time.Second * 10) {
+					pods, err := saboter.Client.CoreV1().Pods("").List(ctx, listOptions)
+					if err != nil {
+						log.Fatal(err)
+					}
+
+					if len(pods.Items) != 0 {
+						labelExists <- true
+						break
+					}
+				}
+			}()
+			select {
+			case <-labelExists:
+				continue
+			case <-time.After(10 * time.Minute):
+				log.Fatal("No pods with sabotage label appeared in 10 minutes, goodbye")
+			}
+		}
+
+		candidate := pods.Items[rand.Int()%len(pods.Items)]
+		log.Printf("Sabotaging pod %s on namespace %s running on node %s...", candidate.Name, candidate.Namespace, candidate.Spec.NodeName)
+		if saboter.Client.CoreV1().Pods(candidate.Namespace).Delete(ctx, candidate.Name, metav1.DeleteOptions{GracePeriodSeconds: &gracePeriodSeconds}) != nil {
+			log.Println(err)
+			continue
+		}
+		log.Printf("Finished sabotaging pod %s on namespace %s running on node %s", candidate.Name, candidate.Namespace, candidate.Spec.NodeName)
 	}
 }
