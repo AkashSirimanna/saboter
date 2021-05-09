@@ -19,11 +19,20 @@ import (
 var (
 	kubepath        string
 	excludedayspath string
+	interval        int64
+	rate            int64
 )
 
 func main() {
 	log.Printf("Starting saboter on %s", time.Now().Format("2006-01-02"))
 	flag.Parse()
+	if rate > 20 || rate < 1 {
+		log.Fatal("rate option must be between 1 and 20")
+	}
+
+	if interval < 1 || interval > 60 {
+		log.Fatal("interval option must be between 1 and 60")
+	}
 
 	stop := signals.SetupSignalHandler()
 
@@ -45,13 +54,15 @@ func main() {
 		excludedDays = parseDays(excludedayspath)
 	}
 
-	saboter := saboter.NewSaboter(client, 1, excludedDays)
+	saboter := saboter.NewSaboter(client, interval, rate, excludedDays)
 	saboter.Start(context.TODO())
 }
 
 func init() {
 	flag.StringVar(&kubepath, "kubepath", "", "Location of kubernetes configuration, defaults to ~/.kube/config")
 	flag.StringVar(&excludedayspath, "exclude", "", "Location of file containing line separated dates formatted as yyyy-mm-dd to not run saboter on")
+	flag.Int64Var(&interval, "interval", 1, "Interval in which saboter sabotages rate pods, must be between 1 and 60")
+	flag.Int64Var(&rate, "rate", 1, "How many pods saboter sabotages every interval, must be between 1 and 20")
 }
 
 func parseDays(path string) map[string]bool {
