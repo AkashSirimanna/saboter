@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"akashsirimanna.com/saboter/saboter"
+  "github.com/akashsirimanna/saboter/pkg/test"
 
 	kubeinformers "k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes"
@@ -25,6 +26,7 @@ var (
 
 func main() {
 	log.Printf("Starting saboter on %s", time.Now().Format("2006-01-02"))
+  log.Printf("Printing from test package to see if it works %d/n", test.Test())
 	flag.Parse()
 	if rate > 20 || rate < 1 {
 		log.Fatal("rate option must be between 1 and 20")
